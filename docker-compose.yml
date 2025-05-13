@@ -1,46 +1,66 @@
-version: "3.9"
 services:
-  db:
-    image: mariadb:10.11
-    container_name: passbolt-db
-    restart: unless-stopped
+  mariadb:
+    container_name: ${MARIADB_CONTAINER_NAME}
+    image: ${MARIADB_IMAGE_NAME}:${MARIADB_IMAGE_VERSION}
+    restart: ${RESTART_POLICY}
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: "true"
-      MYSQL_DATABASE: ${MYSQL_DB}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASS}
+      MYSQL_DATABASE: ${MARIADB_DATABASE}
+      MYSQL_USER: ${MARIADB_USER}
+      MYSQL_PASSWORD: ${MARIADB_PASSWORD}
+      TZ: ${TIMEZONE}
+    ports:
+      - ${MARIADB_PORT}:3306
     volumes:
-      - database_volume:/var/lib/mysql
+      - default:/var/lib/mysql
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
 
   passbolt:
-    image: passbolt/passbolt:latest-ce
-    container_name: passbolt-app
-    restart: unless-stopped
-    depends_on:
-      - db
+    container_name: ${PASSBOLT_CONTAINER_NAME}
+    image: ${PASSBOLT_IMAGE_NAME}:${PASSBOLT_IMAGE_VERSION}
+    restart: ${RESTART_POLICY}
     environment:
-      APP_FULL_BASE_URL: https://localhost
-      DATASOURCES_DEFAULT_HOST: "db"
-      DATASOURCES_DEFAULT_USERNAME: ${MYSQL_USER}
-      DATASOURCES_DEFAULT_PASSWORD: ${MYSQL_PASS}
-      DATASOURCES_DEFAULT_DATABASE: ${MYSQL_DB}
+      APP_FULL_BASE_URL: ${PASSBOLT_APP_URL}
+      DATASOURCES_DEFAULT_HOST: "mariadb"
+      DATASOURCES_DEFAULT_USERNAME: ${MARIADB_USER}
+      DATASOURCES_DEFAULT_PASSWORD: ${MARIADB_PASSWORD}
+      DATASOURCES_DEFAULT_DATABASE: ${MARIADB_DATABASE}
+      TZ: ${TIMEZONE}
+    ports:
+      - ${PASSBOLT_HTTP_PORT}:80
+      - ${PASSBOLT_HTTPS_PORT}:443
     volumes:
       - gpg_volume:/etc/passbolt/gpg
       - jwt_volume:/etc/passbolt/jwt
-    command:
-      [
-        "/usr/bin/wait-for.sh",
-        "-t",
-        "0",
-        "db:3306",
-        "--",
-        "/docker-entrypoint.sh",
-      ]
-    ports:
-      - 80:80
-      - 443:443
+    networks:
+      - default
+    depends_on:
+      - mariadb
+    command: ["/usr/bin/wait-for.sh", "-t", "0", "mariadb:3306", "--", "/docker-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost/healthcheck/status || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+
+networks:
+  default:
+    name: ${PASSBOLT_CONTAINER_NAME}_network
+    driver: bridge
 
 volumes:
-  database_volume:
+  default:
+    name: ${PASSBOLT_CONTAINER_NAME}_data
+    driver: local
   gpg_volume:
+    name: ${PASSBOLT_CONTAINER_NAME}_gpg
+    driver: local
   jwt_volume:
+    name: ${PASSBOLT_CONTAINER_NAME}_jwt
+    driver: local

@@ -28,12 +28,12 @@ services:
     restart: ${RESTART_POLICY}
     environment:
       APP_FULL_BASE_URL: ${PASSBOLT_APP_URL}
-      DATASOURCES_DEFAULT_HOST: "postgres"
-      DATASOURCES_DEFAULT_PORT: "5432"
+      DATASOURCES_DEFAULT_HOST: ${POSTGRES_CONTAINER_NAME}
+      DATASOURCES_DEFAULT_PORT: ${POSTGRES_PORT}
       DATASOURCES_DEFAULT_USERNAME: ${POSTGRES_USER}
       DATASOURCES_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
       DATASOURCES_DEFAULT_DATABASE: ${POSTGRES_DATABASE}
-      DATASOURCES_DEFAULT_DRIVER: "Cake\Database\Driver\Postgres"
+      DATASOURCES_DEFAULT_DRIVER: ${PASSBOLT_DATABASE_DRIVER}
       TZ: ${TIMEZONE}
     ports:
       - ${PASSBOLT_HTTP_PORT}:80
@@ -45,7 +45,7 @@ services:
       - default
     depends_on:
       - postgres
-    command: ["/usr/bin/wait-for.sh", "-t", "0", "postgres:5432", "--", "/docker-entrypoint.sh"]
+    command: ["/usr/bin/wait-for.sh", "-t", "0", "${POSTGRES_CONTAINER_NAME}:${POSTGRES_PORT}", "--", "/docker-entrypoint.sh"]
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://localhost/healthcheck/status || exit 1"]
       interval: ${HEALTHCHECK_INTERVAL}
